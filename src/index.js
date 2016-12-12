@@ -2,6 +2,7 @@
  * Created by balmasi on 2016-09-20.
  */
 import axios from 'axios';
+import _ from 'lodash';
 
 const ENDPOINTS = {
   sandbox: 'https://api.sandbox.romit.io/v1',
@@ -15,7 +16,6 @@ const ERRORS = {
   'err.unexpected_error':	'An unexpected internal error occurred',
   'err.fatal_error':	'An internal fatal error occurred'
 };
-
 
 const SCOPES = {
   'DEFAULT':	'DEFAULT', //  Access to basic information
@@ -35,8 +35,22 @@ const SCOPES = {
   'INVOICE_WRITE':	'INVOICE_WRITE' //  Write access to Invoice
 };
 
+function augmentAPICall (apiFunction) {
+  const augmentedError = new Error();
+  return async function wrappedApi (...args) {
+    try {
+      const { data: romitResponse} = await apiFunction(...args);
+      return romitResponse.response;
+    } catch (error) {
+      augmentedError.message = _.get(error, 'response.data.error.message');
+      augmentedError.url = _.get(error, 'config.url');
+      throw augmentedError;
+    }
+  };
+}
+
 export default class RomitAPI {
-  constructor({ client_id, client_secret, sandbox = false}) {
+  constructor({ client_id, client_secret, sandbox = true}) {
     this.client_info = {
       client_id,
       client_secret
@@ -54,406 +68,628 @@ export default class RomitAPI {
     this._axios.defaults.headers.common.Authorization =  `Bearer ${access_token}`;
   }
 
-
   /**
    * ========  OAUTH  ======
    */
 
-  request_user_authorization({
-    redirect_uri,
-    scope = Object.keys(SCOPES),
-    response_type = 'code',
-    state,
-    phone,
-    email,
-    first,
-    last,
-    currency = 'USD',
-    refresh = 'true',
-    call = false,
-  }) {
-
-    return this._axios.post('/oauth', {
-      ...arguments[0],
-      ...this.client_info
-    });
+  get request_user_authorization() {
+    return augmentAPICall(
+      function request_user_authorization(client_token, {
+        client_id,
+        redirect_uri,
+        scope = Object.keys(SCOPES),
+        response_type = 'code',
+        state,
+        phone,
+        email,
+        first,
+        last,
+        currency = 'USD',
+        refresh = 'true',
+        call = false,
+        }) {
+        this._updateBearer({ access_token: client_token });
+        return this._axios.post('/oauth', {
+          ...arguments[1]
+        });
+      }
+    );
   }
 
-  async finish_user_authorization({
-    code,
-    grant_type = 'authorization_code',
-    redirect_uri = this.redirect_uri
-  }) {
-    const apiResponse = await this._axios.post('/oauth/token', {
-      ...arguments[0],
-      ...this.client_info
-    });
-
-    this._updateBearer(apiResponse.response);
-    return apiResponse;
+  get finish_user_authorization() {
+    return augmentAPICall(
+      function finish_user_authorization({
+        code,
+        grant_type = 'authorization_code',
+        redirect_uri = this.redirect_uri
+        }) {
+        return this._axios.post('/oauth/token', {
+          ...arguments[0],
+          ...this.client_info
+        });
+      }
+    );
   }
 
-  async refresh_user_authorization({
-    code,
-    grant_type = 'refresh_token',
-    refresh_token
-  }) {
-
-    const apiResponse = await this._axios.post('/oauth/token', {
-      ...arguments[0],
-      ...this.client_info
-    });
-
-    this._updateBearer(apiResponse.response);
-    return apiResponse;
+  get refresh_user_authorization() {
+    return augmentAPICall(
+      function refresh_user_authorization({
+        grant_type = 'refresh_token',
+        refresh_token
+        }) {
+        return this._axios.post('/oauth/token', {
+          ...arguments[0],
+          ...this.client_info
+        });
+      }
+    );
   }
 
-
-  async get_client_access_token({
-    grant_type = 'client_credentials'
-  }) {
-    const apiResponse  = await this._axios.post('/oauth/token', {
-      ...arguments[0],
-      ...this.client_info
-    });
-
-    this._updateBearer(apiResponse.response);
-    return apiResponse;
+  get get_client_access_token() {
+    return augmentAPICall(
+      function get_client_access_token({
+        grant_type = 'client_credentials'
+        }) {
+        return this._axios.post('/oauth/token', {
+          ...arguments[0],
+          ...this.client_info
+        });
+      }
+    );
   }
-
-
 
   /**
    * ========  APPLICATION  ======
    */
 
-  get_appication() {
-    return this._axios.get('/');
+  get get_appication() {
+    return this.augmentAPICall(
+      function get_appication(client_token) {
+        this._updateBearer({ access_token: client_token });
+        return this._axios.get('/');
+      }
+    );
   }
 
   /**
    * ========  BANKING  ======
    */
-  get_banking({ limit, offset }) {
-    return this._axios.get('/banking', {
-      params: Object.assign({}, arguments[0])
-    });
+
+  get get_banking() {
+    return this.augmentAPICall(
+      function get_banking(access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/banking', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_banking_card(id) {
-    return this._axios.get(`/banking/card/${id}`);
+  get get_banking_card() {
+    return this.augmentAPICall(
+      function get_banking_card(access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/banking/card/${id}`);
+      }
+    );
   }
 
-  create_banking_card({
-    label,
-    name,
-    number,
-    month,
-    year,
-    cvv,
-    postal
-  }) {
-    return this._axios.post('/banking/card', arguments[0]);
+  get create_banking_card() {
+    return this.augmentAPICall(
+      function create_banking_card(access_token, {
+        label,
+        name,
+        number,
+        month,
+        year,
+        cvv,
+        postal
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/banking/card', arguments[0]);
+      }
+    );
   }
 
-  update_banking_card (id, {
-    label,
-    month,
-    year,
-    cvv,
-    postal
-  }) {
-    return this._axios.put(`/banking/card/${id}`, arguments[1])
+  get update_banking_card() {
+    return this.augmentAPICall(
+      function update_banking_card (access_token, id, {
+        label,
+        month,
+        year,
+        cvv,
+        postal
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/banking/card/${id}`, arguments[1])
+      }
+    );
   }
 
-  disable_banking_card (id) {
-    return this._axios.post(`/banking/card/${id}/disable`);
+  get disable_banking_card() {
+    return this.augmentAPICall(
+      function disable_banking_card (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/banking/card/${id}/disable`);
+      }
+    );
   }
 
-  get_banking_account (id) {
-    return this._axios.put(`/banking/account/${id}`);
+  get get_banking_account() {
+    return this.augmentAPICall(
+      function get_banking_account (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/banking/account/${id}`);
+      }
+    );
   }
 
-  link_banking_accounts ({
-    username,
-    password,
-    instituation,
-    pin
-  }) {
-    return this._axios.post('/banking/account/link', arguments[0])
+  get link_banking_accounts() {
+    return this.augmentAPICall(
+      function link_banking_accounts (access_token, {
+        username,
+        password,
+        instituation,
+        pin
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/banking/account/link', arguments[0])
+      }
+    );
   }
 
-  link_mfa_banking_accounts ({
-    answer,
-    selections,
-    code,
-    sendMethodMask
-  }) {
-    return this._axios.post('/banking/account/link/step', arguments[0])
+  get link_mfa_banking_accounts() {
+    return this.augmentAPICall(
+      function link_mfa_banking_accounts (access_token, {
+        answer,
+        selections,
+        code,
+        sendMethodMask
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/banking/account/link/step', arguments[0])
+      }
+    );
   }
 
-  update_banking_account (id, {
-    label
-  }) {
-    return this._axios.put(`/banking/account/${id}`, arguments[1])
+  get update_banking_account() {
+    return this.augmentAPICall(
+      function update_banking_account (access_token, id, {
+        label
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/banking/account/${id}`, arguments[1])
+      }
+    );
   }
 
-  disable_banking_account (id) {
-    return this._axios.put(`/banking/account/${id}/disable`);
+  get disable_banking_account() {
+    return this.augmentAPICall(
+      function disable_banking_account (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/banking/account/${id}/disable`);
+      }
+    );
   }
-
 
   /**
    * ========  Identity  ======
    */
 
-
-  list_identities ({ limit, offset }) {
-    return this._axios.get('/identity', {
-      params: Object.assign({}, arguments[0])
-    });
+  get list_identities() {
+    return this.augmentAPICall(
+      function list_identities (access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/identity', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_identity_info (id) {
-    return this._axios.get(`/identity/info/${id}`);
+  get get_identity_info() {
+    return this.augmentAPICall(
+      function get_identity_info (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/identity/info/${id}`);
+      }
+    );
   }
 
-  create_identity_info ({
-    first,
-    last,
-    addressOne,
-    addressTwo,
-    city,
-    state,
-    postal,
-    country,
-    dob,
-    gender,
-    type
-  }) {
-    return this._axios.post(`/identity/info/`, arguments[0]);
+  get create_identity_info() {
+    return this.augmentAPICall(
+      function create_identity_info (access_token, {
+        first,
+        last,
+        addressOne,
+        addressTwo,
+        city,
+        state,
+        postal,
+        country,
+        dob,
+        gender,
+        type
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/identity/info/`, arguments[0]);
+      }
+    );
   }
 
-  get_identity_document (id) {
-    return this._axios.get(`/identity/document/${id}`);
+  get get_identity_document() {
+    return this.augmentAPICall(
+      function get_identity_document (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/identity/document/${id}`);
+      }
+    );
   }
 
-  create_identity_document ({
-    file,
-    type
-  }) {
-    return this._axios.post('/identity/document', arguments[0]);
+  get create_identity_document() {
+    return this.augmentAPICall(
+      function create_identity_document (access_token, {
+        file,
+        type
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/identity/document', arguments[0]);
+      }
+    );
   }
 
-  get_identity_social_network (id) {
-    return this._axios.get(`/identity/social/${id}`);
+  get get_identity_social_network() {
+    return this.augmentAPICall(
+      function get_identity_social_network (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/identity/social/${id}`);
+      }
+    );
   }
 
-  create_identity_social_network ({
-    token,
-    type
-  }) {
-    return this._axios.post('/identity/social', arguments[0]);
+  get create_identity_social_network() {
+    return this.augmentAPICall(
+      function create_identity_social_network (access_token, {
+        token,
+        type
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/identity/social', arguments[0]);
+      }
+    );
   }
 
-  get_identity_business (id) {
-    return this._axios.get(`/identity/business/${id}`);
+  get get_identity_business() {
+    return this.augmentAPICall(
+      function get_identity_business (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/identity/business/${id}`);
+      }
+    );
   }
 
-  create_identity_business ({
-    ein,
-    name,
-    addressOne,
-    addressTwo,
-    city,
-    state,
-    postal,
-    country,
-    phone,
-    website,
-    description
-  }) {
-    return this._axios.post('/identity/business', arguments[0]);
+  get create_identity_business() {
+    return this.augmentAPICall(
+      function create_identity_business (access_token, {
+        ein,
+        name,
+        addressOne,
+        addressTwo,
+        city,
+        state,
+        postal,
+        country,
+        phone,
+        website,
+        description
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/identity/business', arguments[0]);
+      }
+    );
   }
 
   /**
    * ========  TRANSFER  ======
    */
 
-  list_transfers ({ limit, offset }) {
-    return this._axios.get('/transfer', {
-      params: Object.assign({}, arguments[0])
-    });
+  get list_transfers() {
+    return this.augmentAPICall(
+      function list_transfers (access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/transfer', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_transfer (id) {
-    return this._axios.get(`/transfer/${id}`);
+  get get_transfer() {
+    return this.augmentAPICall(
+      function get_transfer (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/transfer/${id}`);
+      }
+    );
   }
 
-  create_transfer ({
-    amount,
-    phone,
-    userId,
-    bankingId,
-    invoiceId,
-    memo,
-    mode
-  }) {
-    return this._axios.post(`/transfer`, );
+  get create_transfer() {
+    return this.augmentAPICall(
+      function create_transfer (access_token, {
+        amount,
+        phone,
+        userId,
+        bankingId,
+        invoiceId,
+        memo,
+        mode
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/transfer`);
+      }
+    );
   }
 
-  capture_transfer (id, {
-    amount
-  }) {
-    return this._axios.post(`/transfer/${id}/capture`, arguments[1]);
-
+  get capture_transfer() {
+    return this.augmentAPICall(
+      function capture_transfer (access_token, id, {
+        amount
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/transfer/${id}/capture`, arguments[1]);
+      }
+    );
   }
 
-  refund_transfer (id, {
-    amount,
-    memo
-  }) {
-    return this._axios.post(`/transfer/${id}/refund`, arguments[1]);
+  get refund_transfer() {
+    return this.augmentAPICall(
+      function refund_transfer (access_token, id, {
+        amount,
+        memo
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/transfer/${id}/refund`, arguments[1]);
+      }
+    );
   }
 
-  void_transfer (id) {
-    return this._axios.post(`/transfer/${id}/void`);
+  get void_transfer() {
+    return this.augmentAPICall(
+      function void_transfer (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/transfer/${id}/void`);
+      }
+    );
   }
 
 
   /**
    * ========  USER  ======
    */
-  get_public_user (id, {
-    userId,
-    phoneE164
-  }) {
-    return this._axios.get(`/user/${id}`, {
-      params: Object.assign({}, arguments[1])
-    })
+
+  get get_public_user() {
+    return this.augmentAPICall(
+      function get_public_user (client_token, id, {
+        userId,
+        phoneE164
+        }) {
+        this._updateBearer({ access_token: client_token });
+        return this._axios.get(`/user/${id}`, {
+          params: Object.assign({}, arguments[1])
+        })
+      }
+    );
   }
 
-  get_user () {
-    return this._axios.get(`/user`);
+  get get_user() {
+    return this.augmentAPICall(
+      function get_user (access_token) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/user`);
+      }
+    );
   }
 
   /**
    * ========  SUBSCRIPTION ======
    */
-  list_subscription ({ limit, offset }) {
-    return this._axios.get('/subscription', {
-      params: Object.assign({}, arguments[0])
-    });
+
+  get list_subscription() {
+    return this.augmentAPICall(
+      function list_subscription (access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/subscription', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_subscription (id) {
-    return this._axios.get(`/subscription/${id}`);
+  get get_subscription() {
+    return this.augmentAPICall(
+      function get_subscription (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/subscription/${id}`);
+      }
+    );
   }
 
-  create_subscription ({
-    bankingId,
-    planId
-  }) {
-    return this._axios.post('/subscription', arguments[0]);
+  get create_subscription() {
+    return this.augmentAPICall(
+      function create_subscription (access_token, {
+        bankingId,
+        planId
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/subscription', arguments[0]);
+      }
+    );
   }
 
-  update_subscription (id, {
-    bankingId,
-    planId
-  }) {
-    return this._axios.put(`/subscription/${id}`, arguments[1]);
+  get update_subscription() {
+    return this.augmentAPICall(
+      function update_subscription (access_token, id, {
+        bankingId,
+        planId
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/subscription/${id}`, arguments[1]);
+      }
+    );
   }
 
-  cancel_subscription (id) {
-    return this._axios.post(`/subscription/${id}/cancel`);
-
+  get cancel_subscription() {
+    return this.augmentAPICall(
+      function cancel_subscription (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/subscription/${id}/cancel`);
+      }
+    );
   }
-
 
   /**
    * ========  PLAN  ======
    */
-  list_plan ({ limit, offset }) {
-    return this._axios.get('/plan', {
-      params: Object.assign({}, arguments[0])
-    });
+
+  get list_plan() {
+    return this.augmentAPICall(
+      function list_plan (access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/plan', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_public_plan (id) {
-    return this._axios.get(`/plan/${id}`);
+  get get_public_plan() {
+    return this.augmentAPICall(
+      function get_public_plan (client_token, id) {
+        this._updateBearer({ access_token: client_token });
+        return this._axios.get(`/plan/${id}`);
+      }
+    );
   }
 
-  // same as above?
-  get_plan (id) {
-    return this._axios.get(`/plan/${id}`);
+  get get_plan() {
+    return this.augmentAPICall(
+      function get_plan (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/plan/${id}`);
+      }
+    );
   }
 
-  create_plan ({
-    name,
-    amount,
-    interval,
-    cycles,
-    memo,
-    callback
-  }) {
-    return this._axios.post('/plan', arguments[0]);
+  get create_plan() {
+    return this.augmentAPICall(
+      function create_plan (access_token, {
+        name,
+        amount,
+        interval,
+        cycles,
+        memo,
+        callback
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/plan', arguments[0]);
+      }
+    );
   }
 
-  update_plan (id, {
-    name,
-    memo,
-    callback
-  }) {
-    return this._axios.put(`/plan/${id}`, arguments[1]);
+  get update_plan() {
+    return this.augmentAPICall(
+      function update_plan (access_token, id, {
+        name,
+        memo,
+        callback
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/plan/${id}`, arguments[1]);
+      }
+    );
   }
 
-  disable_plan () {
-    return this._axios.post(`/plan/${id}/disable`);
+  get disable_plan() {
+    return this.augmentAPICall(
+      function disable_plan (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/plan/${id}/disable`);
+      }
+    );
   }
-
 
   /**
    * ========  INVOICE  ======
    */
-  list_invoice ({ limit, offset }) {
-    return this._axios.get('/invoice', {
-      params: Object.assign({}, arguments[0])
-    });
+
+  get list_invoice() {
+    return this.augmentAPICall(
+      function list_invoice (access_token, { limit, offset }) {
+        this._updateBearer({ access_token });
+        return this._axios.get('/invoice', {
+          params: Object.assign({}, arguments[0])
+        });
+      }
+    );
   }
 
-  get_public_invoice (id) {
-    return this._axios.get(`/invoice/${id}`);
+  get get_public_invoice() {
+    return this.augmentAPICall(
+      function get_public_invoice (client_token, id) {
+        this._updateBearer({ access_token: client_token });
+        return this._axios.get(`/invoice/${id}`);
+      }
+    );
   }
 
-  get_invoice (id) {
-    return this._axios.get(`/invoice/${id}`);
+  get get_invoice() {
+    return this.augmentAPICall(
+      function get_invoice (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.get(`/invoice/${id}`);
+      }
+    );
   }
 
-  create_invoice ({
-    description,
-    amount,
-    invoiceDate,
-    dueDate,
-    reference,
-    note,
-    memo,
-    terms
-  }) {
-    return this._axios.post('/invoice', arguments[0]);
+  get create_invoice() {
+    return this.augmentAPICall(
+      function create_invoice (access_token, {
+        description,
+        amount,
+        invoiceDate,
+        dueDate,
+        reference,
+        note,
+        memo,
+        terms
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.post('/invoice', arguments[0]);
+      }
+    );
   }
 
-  update_invoice (id, {
-    reference,
-    memo
-  }) {
-    return this._axios.put(`/invoice/${id}`, arguments[1]);
+  get update_invoice() {
+    return this.augmentAPICall(
+      function update_invoice (access_token, id, {
+        reference,
+        memo
+        }) {
+        this._updateBearer({ access_token });
+        return this._axios.put(`/invoice/${id}`, arguments[1]);
+      }
+    );
   }
 
-
-  cancel_invoice () {
-    return this._axios.post(`/invoice/${id}/cancel`);
+  get cancel_invoice() {
+    return this.augmentAPICall(
+      function cancel_invoice (access_token, id) {
+        this._updateBearer({ access_token });
+        return this._axios.post(`/invoice/${id}/cancel`);
+      }
+    );
   }
-
 }
 
 
