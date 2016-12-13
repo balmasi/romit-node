@@ -35,6 +35,14 @@ const SCOPES = {
   'INVOICE_WRITE':	'INVOICE_WRITE' //  Write access to Invoice
 };
 
+function getHeader (accessToken) {
+  return {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  };
+}
+
 function augmentAPICall (apiFunction) {
   const augmentedError = new Error();
   return async function wrappedApi (...args) {
@@ -63,11 +71,6 @@ export default class RomitAPI {
     });
   }
 
-  _updateBearer ({ access_token}) {
-    if (!access_token) return;
-    this._axios.defaults.headers.common.Authorization =  `Bearer ${access_token}`;
-  }
-
   /**
    * ========  OAUTH  ======
    */
@@ -88,10 +91,9 @@ export default class RomitAPI {
         refresh = 'true',
         call = false,
         }) {
-        this._updateBearer({ access_token: client_token });
         return this._axios.post('/oauth', {
           ...arguments[1]
-        });
+        }, getHeader(client_token));
       }
     );
   }
@@ -142,11 +144,10 @@ export default class RomitAPI {
    * ========  APPLICATION  ======
    */
 
-  get get_appication() {
-    return this.augmentAPICall(
-      function get_appication(client_token) {
-        this._updateBearer({ access_token: client_token });
-        return this._axios.get('/');
+  get get_application() {
+    return augmentAPICall(
+      function get_application(client_token) {
+        return this._axios.get('/', getHeader(client_token));
       }
     );
   }
@@ -156,27 +157,26 @@ export default class RomitAPI {
    */
 
   get get_banking() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_banking(access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/banking', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_banking_card() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_banking_card(access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/banking/card/${id}`);
+        return this._axios.get(`/banking/card/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_banking_card() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_banking_card(access_token, {
         label,
         name,
@@ -186,14 +186,13 @@ export default class RomitAPI {
         cvv,
         postal
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/banking/card', arguments[0]);
+        return this._axios.post('/banking/card', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get update_banking_card() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function update_banking_card (access_token, id, {
         label,
         month,
@@ -201,74 +200,67 @@ export default class RomitAPI {
         cvv,
         postal
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/banking/card/${id}`, arguments[1])
+        return this._axios.put(`/banking/card/${id}`, arguments[2], getHeader(access_token))
       }
     );
   }
 
   get disable_banking_card() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function disable_banking_card (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/banking/card/${id}/disable`);
+        return this._axios.post(`/banking/card/${id}/disable`, {}, getHeader(access_token));
       }
     );
   }
 
   get get_banking_account() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_banking_account (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/banking/account/${id}`);
+        return this._axios.get(`/banking/account/${id}`, getHeader(access_token));
       }
     );
   }
 
   get link_banking_accounts() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function link_banking_accounts (access_token, {
         username,
         password,
         instituation,
         pin
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/banking/account/link', arguments[0])
+        return this._axios.post('/banking/account/link', arguments[1], getHeader(access_token))
       }
     );
   }
 
   get link_mfa_banking_accounts() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function link_mfa_banking_accounts (access_token, {
         answer,
         selections,
         code,
         sendMethodMask
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/banking/account/link/step', arguments[0])
+        return this._axios.post('/banking/account/link/step', arguments[1], getHeader(access_token))
       }
     );
   }
 
   get update_banking_account() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function update_banking_account (access_token, id, {
         label
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/banking/account/${id}`, arguments[1])
+        return this._axios.put(`/banking/account/${id}`, arguments[2], getHeader(access_token))
       }
     );
   }
 
   get disable_banking_account() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function disable_banking_account (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/banking/account/${id}/disable`);
+        return this._axios.post(`/banking/account/${id}/disable`, {}, getHeader(access_token));
       }
     );
   }
@@ -278,27 +270,26 @@ export default class RomitAPI {
    */
 
   get list_identities() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function list_identities (access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/identity', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_identity_info() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_identity_info (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/identity/info/${id}`);
+        return this._axios.get(`/identity/info/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_identity_info() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_identity_info (access_token, {
         first,
         last,
@@ -312,65 +303,59 @@ export default class RomitAPI {
         gender,
         type
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/identity/info/`, arguments[0]);
+        return this._axios.post(`/identity/info/`, arguments[1], getHeader(access_token));
       }
     );
   }
 
   get get_identity_document() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_identity_document (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/identity/document/${id}`);
+        return this._axios.get(`/identity/document/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_identity_document() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_identity_document (access_token, {
         file,
         type
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/identity/document', arguments[0]);
+        return this._axios.post('/identity/document', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get get_identity_social_network() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_identity_social_network (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/identity/social/${id}`);
+        return this._axios.get(`/identity/social/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_identity_social_network() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_identity_social_network (access_token, {
         token,
         type
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/identity/social', arguments[0]);
+        return this._axios.post('/identity/social', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get get_identity_business() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_identity_business (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/identity/business/${id}`);
+        return this._axios.get(`/identity/business/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_identity_business() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_identity_business (access_token, {
         ein,
         name,
@@ -384,8 +369,7 @@ export default class RomitAPI {
         website,
         description
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/identity/business', arguments[0]);
+        return this._axios.post('/identity/business', arguments[1], getHeader(access_token));
       }
     );
   }
@@ -395,27 +379,26 @@ export default class RomitAPI {
    */
 
   get list_transfers() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function list_transfers (access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/transfer', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_transfer() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_transfer (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/transfer/${id}`);
+        return this._axios.get(`/transfer/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_transfer() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_transfer (access_token, {
         amount,
         phone,
@@ -425,40 +408,36 @@ export default class RomitAPI {
         memo,
         mode
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/transfer`);
+        return this._axios.post(`/transfer`, arguments[1], getHeader(access_token));
       }
     );
   }
 
   get capture_transfer() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function capture_transfer (access_token, id, {
         amount
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/transfer/${id}/capture`, arguments[1]);
+        return this._axios.post(`/transfer/${id}/capture`, arguments[2], getHeader(access_token));
       }
     );
   }
 
   get refund_transfer() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function refund_transfer (access_token, id, {
         amount,
         memo
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/transfer/${id}/refund`, arguments[1]);
+        return this._axios.post(`/transfer/${id}/refund`, arguments[2], getHeader(access_token));
       }
     );
   }
 
   get void_transfer() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function void_transfer (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/transfer/${id}/void`);
+        return this._axios.post(`/transfer/${id}/void`, {}, getHeader(access_token));
       }
     );
   }
@@ -469,24 +448,17 @@ export default class RomitAPI {
    */
 
   get get_public_user() {
-    return this.augmentAPICall(
-      function get_public_user (client_token, id, {
-        userId,
-        phoneE164
-        }) {
-        this._updateBearer({ access_token: client_token });
-        return this._axios.get(`/user/${id}`, {
-          params: Object.assign({}, arguments[1])
-        })
+    return augmentAPICall(
+      function get_public_user (client_token, userIdOrPhoneE164) {
+        return this._axios.get(`/user/${userIdOrPhoneE164}`, getHeader(client_token));
       }
     );
   }
 
   get get_user() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_user (access_token) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/user`);
+        return this._axios.get(`/user`, getHeader(access_token));
       }
     );
   }
@@ -496,54 +468,50 @@ export default class RomitAPI {
    */
 
   get list_subscription() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function list_subscription (access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/subscription', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_subscription() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_subscription (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/subscription/${id}`);
+        return this._axios.get(`/subscription/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_subscription() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_subscription (access_token, {
         bankingId,
         planId
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/subscription', arguments[0]);
+        return this._axios.post('/subscription', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get update_subscription() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function update_subscription (access_token, id, {
         bankingId,
         planId
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/subscription/${id}`, arguments[1]);
+        return this._axios.put(`/subscription/${id}`, arguments[2], getHeader(access_token));
       }
     );
   }
 
   get cancel_subscription() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function cancel_subscription (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/subscription/${id}/cancel`);
+        return this._axios.post(`/subscription/${id}/cancel`, {}, getHeader(access_token));
       }
     );
   }
@@ -553,36 +521,34 @@ export default class RomitAPI {
    */
 
   get list_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function list_plan (access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/plan', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_public_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_public_plan (client_token, id) {
-        this._updateBearer({ access_token: client_token });
-        return this._axios.get(`/plan/${id}`);
+        return this._axios.get(`/plan/${id}`, getHeader(client_token));
       }
     );
   }
 
   get get_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_plan (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/plan/${id}`);
+        return this._axios.get(`/plan/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_plan (access_token, {
         name,
         amount,
@@ -591,30 +557,27 @@ export default class RomitAPI {
         memo,
         callback
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/plan', arguments[0]);
+        return this._axios.post('/plan', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get update_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function update_plan (access_token, id, {
         name,
         memo,
         callback
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/plan/${id}`, arguments[1]);
+        return this._axios.put(`/plan/${id}`, arguments[2], getHeader(access_token));
       }
     );
   }
 
   get disable_plan() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function disable_plan (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/plan/${id}/disable`);
+        return this._axios.post(`/plan/${id}/disable`, {}, getHeader(access_token));
       }
     );
   }
@@ -624,36 +587,34 @@ export default class RomitAPI {
    */
 
   get list_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function list_invoice (access_token, { limit, offset }) {
-        this._updateBearer({ access_token });
         return this._axios.get('/invoice', {
-          params: Object.assign({}, arguments[0])
+          ...getHeader(access_token),
+          params: Object.assign({}, arguments[1])
         });
       }
     );
   }
 
   get get_public_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_public_invoice (client_token, id) {
-        this._updateBearer({ access_token: client_token });
-        return this._axios.get(`/invoice/${id}`);
+        return this._axios.get(`/invoice/${id}`, getHeader(client_token));
       }
     );
   }
 
   get get_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function get_invoice (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.get(`/invoice/${id}`);
+        return this._axios.get(`/invoice/${id}`, getHeader(access_token));
       }
     );
   }
 
   get create_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function create_invoice (access_token, {
         description,
         amount,
@@ -664,29 +625,26 @@ export default class RomitAPI {
         memo,
         terms
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.post('/invoice', arguments[0]);
+        return this._axios.post('/invoice', arguments[1], getHeader(access_token));
       }
     );
   }
 
   get update_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function update_invoice (access_token, id, {
         reference,
         memo
         }) {
-        this._updateBearer({ access_token });
-        return this._axios.put(`/invoice/${id}`, arguments[1]);
+        return this._axios.put(`/invoice/${id}`, arguments[2], getHeader(access_token));
       }
     );
   }
 
   get cancel_invoice() {
-    return this.augmentAPICall(
+    return augmentAPICall(
       function cancel_invoice (access_token, id) {
-        this._updateBearer({ access_token });
-        return this._axios.post(`/invoice/${id}/cancel`);
+        return this._axios.post(`/invoice/${id}/cancel`, {}, getHeader(access_token));
       }
     );
   }
